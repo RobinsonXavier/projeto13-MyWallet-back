@@ -114,6 +114,19 @@ app.post('/values', async (req, res) => {
             return res.sendStatus(401);
         }
 
+        if (type === 'exit') {
+            await db.collection('values').insertOne({
+                userId: ObjectId(userId),
+                description,
+                value: -value,
+                type,
+                time: dayjs().format('DD/MM')
+            });
+    
+            res.sendStatus(201);
+            return;
+        }
+
         await db.collection('values').insertOne({
             userId: ObjectId(userId),
             description,
@@ -248,6 +261,17 @@ app.post('/status', async (req, res) => {
     }
 });
 
+setInterval(async () => {
+    const lastUpdate = Date.now() - 15 * 1000;
+
+    try {
+        await db.collection('logged').deleteMany({lastStatus: {$lte: lastUpdate}});
+    } catch (error) {
+        console.error(error);
+        res.status(500);
+        return;
+    }
+}, 20000);
 
 
 app.listen(5000, () => {
