@@ -4,6 +4,7 @@ import { MongoClient } from 'mongodb';
 import dotenv from 'dotenv';
 import joi from 'joi';
 import bcrypt from 'bcrypt';
+import {v4 as uuid} from 'uuid';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -16,7 +17,8 @@ app.use(cors());
 const signupSchema = joi.object({
     name: joi.string().required(),
     email: joi.string().email().required(),
-    password: joi.string().required()
+    password: joi.string().required(),
+    confirmPassword: joi.string().required()
 });
 
 const signinSchema = joi.object({
@@ -41,6 +43,31 @@ mongoClient.connect().then(() => {
 
 //ATIVIDADES DISPONIVEIS NO SERVIDOR
 
+app.get('/values/:id', async (req, res) => {
+    const id = ObjectId(req.params.id);
+
+    try {
+        const response = await db.collection('values').findOne({userId: id, });
+
+        const user = await db.collection('users').findOne({_id: id});
+
+        if(!user){
+            return res.status(404).send('usuário não encontrado');
+        }
+
+        if (!response) {
+           return res.send({});
+        }
+
+        res.send(response);
+
+        
+    } catch (error) {
+        console.error(error); 
+        return res.sendStatus(500);
+    }
+});
+
 app.post('/sign-up', async (req, res) => {
 
     const {name, email, password, confirmPassword} = req.body;
@@ -61,6 +88,14 @@ app.post('/sign-up', async (req, res) => {
     const hashPassword = bcrypt.hashSync(password, 10);
 
     try {
+
+        const foundEmail = await db.collection('users').findOne( { email, });
+
+        if (foundEmail) {
+            res.status(409).send('o email já está cadastrado.');
+            return;
+        }
+
         await db.collection('users').insertOne({
             name,
             email,
@@ -99,13 +134,25 @@ app.post('/sign-in', async (req, res) => {
             return res.status(404).send('Usuário ou senha não encontrada');
         }
 
-        return res.send(200);
-        
+        const token = uuid();
+
+        await db.collection('logged').insertOne( {
+            userId: user._id,
+            token
+        })
+
+        return res.status(200).send({
+            name: user.name,
+            id: user._id,
+            token
+        });
+
     } catch (error) {
         console.error(error); 
         return res.sendStatus(500);
     }
 });
+
 
 
 
