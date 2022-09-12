@@ -1,7 +1,8 @@
 import express from 'express';
 import cors from 'cors';
-import { MongoClient } from 'mongodb';
+import { MongoClient, ObjectId } from 'mongodb';
 import dotenv from 'dotenv';
+import dayjs from 'dayjs';
 import joi from 'joi';
 import bcrypt from 'bcrypt';
 import {v4 as uuid} from 'uuid';
@@ -26,6 +27,13 @@ const signinSchema = joi.object({
     password: joi.string().required()
 });
 
+const valueSchema = joi.object({
+    description: joi.string().required(),
+    value: joi.number().required(),
+    type: joi.string().valid('entry', 'exit').required(),
+    userId: joi.string().required()
+});
+
 //PATH CRIADO PARA SER CAPAZ DE LER O ARQUIVO .ENV NA PASTA PRINCIPAL
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -47,7 +55,7 @@ app.get('/values/:id', async (req, res) => {
     const id = ObjectId(req.params.id);
 
     try {
-        const response = await db.collection('values').findOne({userId: id, });
+        const response = await db.collection('values').find({userId: id}).toArray();
 
         const user = await db.collection('users').findOne({_id: id});
 
@@ -59,13 +67,48 @@ app.get('/values/:id', async (req, res) => {
            return res.send({});
         }
 
-        res.send(response);
+        const newResponse = response.map(element => {
+            delete element._id;
+            return element; 
+        })
+
+        res.send(newResponse);
 
         
     } catch (error) {
         console.error(error); 
         return res.sendStatus(500);
     }
+});
+
+app.post('/values', async (req, res) => {
+    const {description, value, type, userId} = req.body;
+
+    const validation = valueSchema.validate(req.body, {abortEarly: false});
+
+    if (validation.error) {
+        const errors = validation.error.details.map(detail => detail.message);
+        res.status(422).send(errors);
+        return;
+    }
+
+    try {
+
+        await db.collection('values').insertOne({
+            userId: ObjectId(userId),
+            description,
+            value,
+            type,
+            time: dayjs().format('HH:mm:ss')
+        });
+
+        res.sendStatus(201);
+        
+    } catch (error) {
+        console.error(error); 
+        return res.sendStatus(500);
+    }
+
 });
 
 app.post('/sign-up', async (req, res) => {
