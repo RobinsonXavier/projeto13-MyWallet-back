@@ -53,8 +53,19 @@ mongoClient.connect().then(() => {
 
 app.get('/values/:id', async (req, res) => {
     const id = ObjectId(req.params.id);
+    const {authorization} = req.headers;
 
+    const token = authorization?.replace('Bearer ', '');
+    
     try {
+
+        const userToken = await db.collection('logged').findOne({token});
+        const compareId = userToken.userId?.toString();
+
+        if (!token || compareId !== req.params.id) {
+            return res.sendStatus(401);
+        }
+
         const response = await db.collection('values').find({userId: id}).toArray();
 
         const user = await db.collection('users').findOne({_id: id});
