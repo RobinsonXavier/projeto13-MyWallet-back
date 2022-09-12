@@ -119,7 +119,7 @@ app.post('/values', async (req, res) => {
             description,
             value,
             type,
-            time: dayjs().format('HH:mm:ss')
+            time: dayjs().format('DD/MM')
         });
 
         res.sendStatus(201);
@@ -201,7 +201,8 @@ app.post('/sign-in', async (req, res) => {
 
         await db.collection('logged').insertOne( {
             userId: user._id,
-            token
+            token,
+            lastStatus: Date.now()
         })
 
         return res.status(200).send({
@@ -216,7 +217,36 @@ app.post('/sign-in', async (req, res) => {
     }
 });
 
+app.post('/status', async (req, res) => {
+    const {user, authorization} = req.headers;
 
+    const token = authorization?.replace('Bearer ', '');
+
+    try {
+
+        const loggedUser = await db.collection('logged').findOne({userId: ObjectId(user)});
+        const compareToken = loggedUser?.token;
+
+        if(!token || compareToken !== token) {
+            res.sendStatus(401);
+            return;
+        }
+        
+        if (!loggedUser) {
+            res.sendStatus(404);
+            return;
+        }
+
+        await db.collection('logged').updateOne({userId: ObjectId(user)}, {$set: {lastStatus: Date.now()}});
+
+        res.status(200).send('Atualizado');
+        
+    } catch (error) {
+        console.error(error);
+        res.status(500);
+        return;
+    }
+});
 
 
 
