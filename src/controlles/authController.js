@@ -2,6 +2,8 @@ import bcrypt from 'bcrypt';
 import {v4 as uuid} from 'uuid';
 import joi from 'joi';
 import db from '../database/db.js';
+import { ObjectId } from 'mongodb';
+
 
 
 const signupSchema = joi.object({
@@ -103,5 +105,47 @@ async function userLogin (req, res) {
     }
 };
 
+async function updateLoggedUsersStatus (req, res) {
+    const {user, authorization} = req.headers;
 
-export {createUser, userLogin};
+    const token = authorization?.replace('Bearer ', '');
+
+    try {
+
+        const loggedUser = await db.collection('logged').findOne({userId: ObjectId(user)});
+        const compareToken = loggedUser?.token;
+
+        if(!token || compareToken !== token) {
+            res.sendStatus(401);
+            return;
+        }
+        
+        if (!loggedUser) {
+            res.sendStatus(404);
+            return;
+        }
+
+        await db.collection('logged').updateOne({userId: ObjectId(user)}, {$set: {lastStatus: Date.now()}});
+
+        res.status(200).send('Atualizado');
+        
+    } catch (error) {
+        console.error(error);
+        res.status(500);
+        return;
+    }
+}
+
+async function setIntervalDeleteOfflineUsers () {
+    const lastUpdate = Date.now() - 15 * 1000;
+
+    try {
+        await db.collection('logged').deleteMany({lastStatus: {$lte: lastUpdate}});
+    } catch (error) {
+        console.error(error);
+        res.status(500);
+        return;
+    }
+}
+
+export {createUser, userLogin, updateLoggedUsersStatus, setIntervalDeleteOfflineUsers};
