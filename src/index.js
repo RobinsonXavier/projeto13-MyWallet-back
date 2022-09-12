@@ -13,10 +13,15 @@ app.use(cors());
 
 
 //SCHEMAS PARA VALIDAR
-const userSchema = joi.object({
+const signupSchema = joi.object({
     name: joi.string().required(),
     email: joi.string().email().required(),
-    password: joi.string().email().required()
+    password: joi.string().required()
+});
+
+const signinSchema = joi.object({
+    email: joi.string().email().required(),
+    password: joi.string().required()
 });
 
 //PATH CRIADO PARA SER CAPAZ DE LER O ARQUIVO .ENV NA PASTA PRINCIPAL
@@ -40,7 +45,7 @@ app.post('/sign-up', async (req, res) => {
 
     const {name, email, password, confirmPassword} = req.body;
 
-    const validation = userSchema.validate(user, {abortEarly: false});
+    const validation = signupSchema.validate(req.body, {abortEarly: false});
 
     if (validation.error) {
         const errors = validation.error.details.map(detail => detail.message);
@@ -68,6 +73,38 @@ app.post('/sign-up', async (req, res) => {
     }
 
 
+});
+
+app.post('/sign-in', async (req, res) => {
+    const {email, password} = req.body;
+
+    const validation = signinSchema.validate(req.body, {abortEarly: false});
+
+    if (validation.error) {
+        const errors = validation.error.details.map(detail => detail.message);
+        res.status(422).send(errors);
+        return;
+    }
+
+    try {
+        const user = await db.collection('users').findOne({ email, });
+
+        if (!user) {
+            return res.status(404).send('Usuário ou senha não encontrada');
+        }
+
+        const isValid = bcrypt.compareSync(password, user.password);
+
+        if (!isValid) {
+            return res.status(404).send('Usuário ou senha não encontrada');
+        }
+
+        return res.send(200);
+        
+    } catch (error) {
+        console.error(error); 
+        return res.sendStatus(500);
+    }
 });
 
 
