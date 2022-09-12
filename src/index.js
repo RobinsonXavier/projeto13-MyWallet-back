@@ -94,6 +94,9 @@ app.get('/values/:id', async (req, res) => {
 
 app.post('/values', async (req, res) => {
     const {description, value, type, userId} = req.body;
+    const {authorization} = req.headers;
+
+    const token = authorization?.replace('Bearer ', '');
 
     const validation = valueSchema.validate(req.body, {abortEarly: false});
 
@@ -104,6 +107,12 @@ app.post('/values', async (req, res) => {
     }
 
     try {
+        const userToken = await db.collection('logged').findOne({token});
+        const compareId = userToken.userId?.toString();
+
+        if (!token || compareId !== userId) {
+            return res.sendStatus(401);
+        }
 
         await db.collection('values').insertOne({
             userId: ObjectId(userId),
